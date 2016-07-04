@@ -15,13 +15,8 @@ import (
 	"strings"
 )
 
-var (
-	arg = struct {
-		Path      string
-		Interface string
-	}{}
-	logger *log.Logger
-	usage  = `Find types that implement a specified interface in go programs.
+const (
+	usage = `Find types that implement a specified interface in go programs.
 
 Example:
   impl -interface datastore.RawInterface -path ~/go/src/github.com/luci/gae
@@ -29,8 +24,15 @@ Example:
 Usage:`
 )
 
-func main() {
+var (
+	arg = struct {
+		Path      string
+		Interface string
+	}{}
 	logger = log.New(os.Stderr, "impl: ", 0)
+)
+
+func main() {
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, usage)
 		flag.PrintDefaults()
@@ -38,7 +40,6 @@ func main() {
 	flag.StringVar(&arg.Path, "path", "", "absolute or relative path to directory to search")
 	flag.StringVar(&arg.Interface, "interface", "", "interface name to find implementing types for, format: packageName.interfaceName")
 	flag.Parse()
-
 	if err := checkFlags(); err != nil {
 		logger.Fatal(err)
 	}
@@ -57,6 +58,18 @@ Run 'impl -h' for details.`)
 	return nil
 }
 
+// findDef returns position of the declared type for the supplied type.
+func findDef(typ types.Type) token.Pos {
+	switch n := typ.(type) {
+	case *types.Named:
+		return n.Obj().Pos()
+	case *types.Pointer:
+		return findDef(n.Elem())
+	default:
+		return token.NoPos
+	}
+}
+
 func mainImpl() {
 	objects, err := getObjectsRecursive(arg.Path)
 	if err != nil {
@@ -67,7 +80,7 @@ func mainImpl() {
 	seen := make(map[Char]CharSet)
 
 	for _, iface := range interfaces {
-		i := Char{iface.Pkg(), iface.Name()}
+		i := NewChar(iface)
 		if _, ok := seen[i]; ok {
 			// Seen this interface before.
 			continue
@@ -76,7 +89,7 @@ func mainImpl() {
 		printHeader(iface)
 
 		for _, obj := range objects {
-			o := Char{obj.Pkg(), obj.Name()}
+			o := NewChar(obj)
 			if seen[i][o] {
 				// Seen this interface-object pair before.
 				continue
@@ -86,7 +99,6 @@ func mainImpl() {
 				printImplementer(obj)
 			}
 		}
-
 		fmt.Println()
 	}
 }
@@ -99,19 +111,35 @@ type ObjectIdent struct {
 	FileSet *token.FileSet
 }
 
+// Char is the set of characteristics required to determine if two identifiers
+// are the same: they are from the same package and have the same type name.
+// For Char objects a and b, if a==b then a and b are the same according to the above
+// definition.
+//
+// Use NewChar to create a Char.
 type Char struct {
-	Package *types.Package
-	Name    string
+	pkg      *types.Package
+	typeName string
 }
 
+func NewChar(obj types.Object) Char {
+	return Char{obj.Pkg(), types.TypeString(obj.Type(), nil)}
+}
+
+// CharSet is a set of Char.
 type CharSet map[Char]bool
 
-func sameObj(a, b types.Object) bool {
-	return Char{a.Pkg(), a.Name()} == Char{b.Pkg(), b.Name()}
+func printHeader(o ObjectIdent) {
+	name := types.TypeString(o.Type(), nil)
+	pos := o.FileSet.Position(o.Pos())
+	fmt.Printf("%s (%s) is implemented by:\n", name, pos)
 }
 
-func printHeader(i interface{})      {}
-func printImplementer(i interface{}) {}
+func printImplementer(o ObjectIdent) {
+	name := types.TypeString(o.Type(), nil)
+	pos := o.FileSet.Position(findDef(o.Type()))
+	fmt.Printf("  %s: %s\n", pos, name)
+}
 
 // filterInterfaces returns the interface types in objs whose
 // packageName.interfaceName==name.
@@ -128,12 +156,13 @@ func filterInterfaces(objs []ObjectIdent, name string) (ifaces []ObjectIdent) {
 // intuitiveImplements is similar to types.Implements, except that it returns
 // false if obj and iface are types with the same name in the same package.
 func intuitiveImplements(obj types.Object, iface types.Object) bool {
-	if sameObj(obj, iface) {
+	if NewChar(obj) == NewChar(iface) {
 		return false
 	}
 	return types.Implements(obj.Type(), iface.Type().Underlying().(*types.Interface))
 }
 
+// getObjectsRecusrsive walks each directory in path and calls getObjects.
 func getObjectsRecursive(path string) ([]ObjectIdent, error) {
 	// Ensure provided path is directory.
 	f, err := os.Open(arg.Path)
@@ -143,7 +172,7 @@ func getObjectsRecursive(path string) ([]ObjectIdent, error) {
 	if info, err := f.Stat(); err != nil {
 		return nil, err
 	} else if !info.IsDir() {
-		return nil, errors.New("path should be a directory.")
+		return nil, errors.New("path must be a directory.")
 	}
 
 	var (
@@ -161,6 +190,7 @@ func getObjectsRecursive(path string) ([]ObjectIdent, error) {
 		go func() {
 			if err != nil {
 				errCh <- err
+				return
 			}
 			errCh <- getObjects(path, c)
 		}()
@@ -186,7 +216,6 @@ func getObjectsRecursive(path string) ([]ObjectIdent, error) {
 // getObjects combines and sends a ObjectIdent for each types.Object
 // whose ast.ObjKind==Typ found in the packages in the supplied path.
 func getObjects(path string, ch chan<- ObjectIdent) error {
-	defer close(ch)
 	fset := token.NewFileSet()
 	m, err := parser.ParseDir(fset, path, nil, 0)
 	if err != nil {
@@ -217,6 +246,7 @@ func getObjects(path string, ch chan<- ObjectIdent) error {
 		select {
 		case obj, ok := <-finalCh:
 			if !ok {
+				close(ch)
 				return nil
 			}
 			ch <- obj
@@ -240,10 +270,10 @@ func getObjectsPkg(tree *ast.Package, conf *types.Config, fset *token.FileSet, c
 	}
 
 	if _, err := conf.Check(pkgName, fset, files, &info); err != nil {
-		close(ch)
 		return wrapErr(`type-checks failed.
-		Make sure dependencies are completely installed.
-		See issue: https://github.com/golang/go/issues/9702`, err)
+Make sure dependencies are completely installed.
+See issue: https://github.com/golang/go/issues/9702.
+`, err)
 	}
 
 	go func() {
