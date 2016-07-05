@@ -137,7 +137,7 @@ func output(res []Result, format string) {
 	switch format {
 	case "plain":
 		const sep = ": "
-		// Find longest path+sep.
+		// Aligned printing.
 		longest := 0
 		for _, r := range res {
 			for _, ri := range r.Implementers {
