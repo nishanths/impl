@@ -13,21 +13,6 @@ import (
 // TestableResults is used to add helper methods for testing.
 type TestableResults []Result
 
-// HasImplementer returns true if tr has exactly one Implementer with the given
-// name.
-func (tr TestableResults) HasImplementer(name string) bool {
-	seenOnce := false
-	for _, r := range tr {
-		for _, im := range r.Implementers {
-			if im.Name == name && seenOnce {
-				return false
-			}
-			seenOnce = true
-		}
-	}
-	return seenOnce
-}
-
 // TestableExpect is a simple combination of a type name and filename where
 // the type lives, the minimal needed for testing.
 type TestableExpect struct {
