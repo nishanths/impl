@@ -18,7 +18,7 @@ Flags:
   -interface string
     	interface name to find implementing types for, format: packageName.interfaceName
   -path string
-    	absolute or relative path to directory to file
+    	absolute or relative path to directory or file
 ```
 
 The `-interface` and `-path` flags are required.
@@ -30,7 +30,7 @@ The implementer type and interface type should both reside in the supplied path.
 With Go installed:
 
 ```
-go get -u github.com/nishanths/impl/...
+go get -u github.com/nishanths/impl
 ```
 
 ## License
