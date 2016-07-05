@@ -35,7 +35,6 @@ var (
 		Interface    string
 		Format       string
 		ConcreteOnly bool
-		NoColor      bool
 	}{}
 	logger = log.New(os.Stderr, "impl: ", 0)
 )
@@ -63,17 +62,17 @@ func mainImpl() {
 	if err != nil {
 		logger.Fatal(err)
 	}
-	results := findImplementers(objects, arg.Interface)
+	results := findImplementers(objects, arg.Interface, arg.ConcreteOnly)
 	output(results, arg.Format)
 }
 
 func checkFlags() error {
 	switch {
 	case arg.Path == "":
-		return errors.New(`must specify directory to search.
+		return errors.New(`must specify directory to search (-path flag).
 Run 'impl -h' for details.`)
 	case len(strings.Split(arg.Interface, ".")) != 2:
-		return errors.New(`must specify interface name in format: packageName.interfaceName.
+		return errors.New(`must specify interface name in format: packageName.interfaceName (-interface flag).
 Run 'impl -h' for details.`)
 	case !contains([]string{"plain", "json", "xml"}, arg.Format):
 		return errors.New(`output format should be one of: {plain,json,xml}
@@ -99,7 +98,7 @@ func findDef(typ types.Type) token.Pos {
 // findImplementers returns the ObjectIdents in the supplied objects that
 // implement targetInterface. targetInterface should be of the form:
 // packageName.InterfaceName.
-func findImplementers(objects []ObjectIdent, targetInterface string) []Result {
+func findImplementers(objects []ObjectIdent, targetInterface string, concreteOnly bool) []Result {
 	interfaces := filterInterfaces(objects, targetInterface)
 	seen := make(map[Char]CharSet)
 	var results []Result
@@ -120,6 +119,9 @@ func findImplementers(objects []ObjectIdent, targetInterface string) []Result {
 				continue
 			}
 			seen[in][o] = true
+			if concreteOnly && types.IsInterface(obj.Type()) {
+				continue
+			}
 			if intuitiveImplements(obj, iface) {
 				res.Implementers = append(res.Implementers, NewResultIdentifier(obj))
 			}
@@ -134,13 +136,24 @@ func findImplementers(objects []ObjectIdent, targetInterface string) []Result {
 func output(res []Result, format string) {
 	switch format {
 	case "plain":
+		const sep = ": "
+		// Find longest path+sep.
+		longest := 0
+		for _, r := range res {
+			for _, ri := range r.Implementers {
+				path := filepath.Base(ri.Pos.String())
+				if len(path)+len(sep) > longest {
+					longest = len(path) + len(sep)
+				}
+			}
+		}
 		for i, r := range res {
 			if len(r.Implementers) == 0 {
 				fmt.Println("No implementing types.")
 			}
 			for _, ri := range r.Implementers {
 				path := filepath.Base(ri.Pos.String())
-				fmt.Printf("%s: %s\n", path, ri.Name)
+				fmt.Printf("%-*s%s\n", longest, path+sep, ri.Name)
 			}
 			if i != len(res)-1 {
 				fmt.Println()
