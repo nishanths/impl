@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	usage = `Find implementing types in go source code.
+	usage = `Find the implementers of an interface in go source code.
 
 Examples:
   impl -interface discovery.SwaggerSchemaInterface -path ~/go/src/k8s.io/kubernetes/pkg/client/typed/discovery

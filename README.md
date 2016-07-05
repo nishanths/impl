@@ -17,9 +17,7 @@ More options:
 
 ```
 $ impl -help
-Find implementers of an interface in go source code.
-
-Find implementing types in go source code.
+Find the implementers of an interface in go source code.
 
 Examples:
   impl -interface discovery.SwaggerSchemaInterface -path ~/go/src/k8s.io/kubernetes/pkg/client/typed/discovery
