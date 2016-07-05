@@ -45,7 +45,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, usage)
 		flag.PrintDefaults()
 	}
-	flag.StringVar(&arg.Path, "path", "", "absolute or relative path to directory to file")
+	flag.StringVar(&arg.Path, "path", "", "absolute or relative path to directory or file")
 	flag.StringVar(&arg.Interface, "interface", "", "interface name to find implementing types for, format: packageName.interfaceName")
 	flag.StringVar(&arg.Format, "format", "plain", "output format, should be one of: {plain,json,xml}")
 	flag.BoolVar(&arg.ConcreteOnly, "concrete-only", false, "output concrete types only, by default the output contains both interface and concrete types that implement the specified interface")

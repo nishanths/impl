@@ -1,6 +1,6 @@
 # impl
 
-impl is a tool to find impelementers of an interface in Go programs.
+impl is a tool to find implementers of an interface in Go programs.
 
 ```
 $ ./impl -help
