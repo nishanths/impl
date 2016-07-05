@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -13,6 +14,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/fatih/color"
 )
 
 const (
@@ -28,8 +31,12 @@ var (
 	arg = struct {
 		Path      string
 		Interface string
+		Format    string
+		NoColor   bool
 	}{}
 	logger = log.New(os.Stderr, "impl: ", 0)
+	green  = color.New(color.FgHiGreen, color.Bold).SprintFunc()
+	yellow = color.New(color.FgHiYellow).SprintFunc()
 )
 
 func main() {
@@ -39,11 +46,24 @@ func main() {
 	}
 	flag.StringVar(&arg.Path, "path", "", "absolute or relative path to directory to search")
 	flag.StringVar(&arg.Interface, "interface", "", "interface name to find implementing types for, format: packageName.interfaceName")
+	flag.StringVar(&arg.Format, "format", "plain", "output format, one of: {plain,json,xml}")
+	flag.BoolVar(&arg.NoColor, "no-color", false, "disable color output")
 	flag.Parse()
+
 	if err := checkFlags(); err != nil {
 		logger.Fatal(err)
 	}
+
 	mainImpl()
+}
+
+func mainImpl() {
+	objects, err := getObjectsRecursive(arg.Path)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	results := findImplementers(objects, arg.Interface)
+	output(results, arg.Format)
 }
 
 func checkFlags() error {
@@ -54,6 +74,8 @@ Run 'impl -h' for details.`)
 	case len(strings.Split(arg.Interface, ".")) != 2:
 		return errors.New(`must specify interface name in format: packageName.interfaceName.
 Run 'impl -h' for details.`)
+	case !contains([]string{"plain", "json", "xml"}, arg.Format):
+		return errors.New(`output format should be one of: {plain,json,xml}`)
 	}
 	return nil
 }
@@ -70,37 +92,88 @@ func findDef(typ types.Type) token.Pos {
 	}
 }
 
-func mainImpl() {
-	objects, err := getObjectsRecursive(arg.Path)
-	if err != nil {
-		logger.Fatal(err)
-	}
-
-	interfaces := filterInterfaces(objects, arg.Interface)
+func findImplementers(objects []ObjectIdent, targetInterface string) []Result {
+	interfaces := filterInterfaces(objects, targetInterface)
 	seen := make(map[Char]CharSet)
+	var results []Result
 
 	for _, iface := range interfaces {
-		i := NewChar(iface)
-		if _, ok := seen[i]; ok {
+		in := NewChar(iface)
+		if _, ok := seen[in]; ok {
 			// Seen this interface before.
 			continue
 		}
-		seen[i] = make(CharSet)
-		printHeader(iface)
+		seen[in] = make(CharSet)
+		res := Result{Interface: NewResultIdentifier(iface)}
 
 		for _, obj := range objects {
 			o := NewChar(obj)
-			if seen[i][o] {
+			if seen[in][o] {
 				// Seen this interface-object pair before.
 				continue
 			}
-			seen[i][o] = true
+			seen[in][o] = true
 			if intuitiveImplements(obj, iface) {
-				printImplementer(obj)
+				res.Implementers = append(res.Implementers, NewResultIdentifier(obj))
 			}
 		}
-		fmt.Println()
+		results = append(results, res)
 	}
+
+	return results
+}
+
+func output(res []Result, format string) {
+	switch format {
+	case "plain":
+		for i, r := range res {
+			fmt.Println(formatHeader(r.Interface))
+			for _, ri := range r.Implementers {
+				fmt.Println(formatImplementer(ri))
+			}
+			if i != len(res)-1 {
+				fmt.Println()
+			}
+		}
+	case "json":
+		b, err := json.MarshalIndent(res, "", "  ")
+		if err != nil {
+			logger.Fatal(err)
+		}
+		fmt.Printf("%s\n", b)
+	case "xml":
+	}
+}
+
+type Result struct {
+	Interface    ResultIdentifier
+	Implementers []ResultIdentifier
+}
+
+type ResultIdentifier struct {
+	Name string
+	Pos  token.Position
+}
+
+func NewResultIdentifier(o ObjectIdent) ResultIdentifier {
+	return ResultIdentifier{
+		Name: types.TypeString(o.Type(), nil),
+		Pos:  o.FileSet.Position(o.Pos()),
+	}
+}
+
+func formatHeader(r ResultIdentifier) string {
+	if !arg.NoColor {
+		r.Name = green(r.Name)
+	}
+	return fmt.Sprintf("%s: %s", r.Name, r.Pos)
+}
+
+func formatImplementer(r ResultIdentifier) string {
+	if !arg.NoColor {
+		r.Name = yellow(r.Name)
+	}
+	return fmt.Sprintf("  %s: %s", r.Name, r.Pos)
 }
 
 // ObjectIdent is a combination of types.Object, *ast.Ident, and
@@ -129,16 +202,13 @@ func NewChar(obj types.Object) Char {
 // CharSet is a set of Char.
 type CharSet map[Char]bool
 
-func printHeader(o ObjectIdent) {
-	name := types.TypeString(o.Type(), nil)
-	pos := o.FileSet.Position(o.Pos())
-	fmt.Printf("%s (%s) is implemented by:\n", name, pos)
-}
-
-func printImplementer(o ObjectIdent) {
-	name := types.TypeString(o.Type(), nil)
-	pos := o.FileSet.Position(findDef(o.Type()))
-	fmt.Printf("  %s: %s\n", pos, name)
+func contains(list []string, target string) bool {
+	for _, s := range list {
+		if s == target {
+			return true
+		}
+	}
+	return false
 }
 
 // filterInterfaces returns the interface types in objs whose
@@ -165,7 +235,7 @@ func intuitiveImplements(obj types.Object, iface types.Object) bool {
 // getObjectsRecusrsive walks each directory in path and calls getObjects.
 func getObjectsRecursive(path string) ([]ObjectIdent, error) {
 	// Ensure provided path is directory.
-	f, err := os.Open(arg.Path)
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +251,7 @@ func getObjectsRecursive(path string) ([]ObjectIdent, error) {
 		errCh     = make(chan error)
 	)
 
-	filepath.Walk(arg.Path, func(path string, finfo os.FileInfo, err error) error {
+	filepath.Walk(path, func(path string, finfo os.FileInfo, err error) error {
 		if !finfo.IsDir() {
 			return nil
 		}
