@@ -1,6 +1,7 @@
 # impl
 
-[![wercker status](https://app.wercker.com/status/cbdba36a399298dc7483ea16c241a6aa/s/master "wercker status")](https://app.wercker.com/project/bykey/cbdba36a399298dc7483ea16c241a6aa)
+[![wercker status](https://app.wercker.com/status/cbdba36a399298dc7483ea16c241a6aa/s/master "wercker status")](https://app.wercker.com/project/bykey/cbdba36a399298dc7483ea16c241a6aa) 
+[![CircleCI](https://circleci.com/gh/nishanths/impl.svg?style=svg)](https://circleci.com/gh/nishanths/impl)
 
 impl is a tool to find implementers of an interface in Go programs.
 
@@ -18,9 +19,11 @@ More options:
 $ impl -help
 Find implementers of an interface in go source code.
 
+Find implementing types in go source code.
+
 Examples:
-  impl -interface discovery.SwaggerSchemaInterface -path ./k8s.io/kubernetes/pkg/client/typed/discovery
-  impl -interface datastore.RawInterface -path ~go/src/github.com/luci/gae/service/datastore -format json 
+  impl -interface discovery.SwaggerSchemaInterface -path ~/go/src/k8s.io/kubernetes/pkg/client/typed/discovery
+  impl -interface datastore.RawInterface -path ./luci/gae/service/datastore -format json 
 
 Flags:
   -concrete-only
