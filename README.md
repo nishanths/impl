@@ -1,8 +1,8 @@
 # impl
 
-impl is a tool to find implementers of an interface in Go programs.
+[![wercker status](https://app.wercker.com/status/cbdba36a399298dc7483ea16c241a6aa/s/master "wercker status")](https://app.wercker.com/project/bykey/cbdba36a399298dc7483ea16c241a6aa)
 
-[![CircleCI](https://circleci.com/gh/nishanths/impl.svg?style=svg)](https://circleci.com/gh/nishanths/impl)
+impl is a tool to find implementers of an interface in Go programs.
 
 For example:
 
