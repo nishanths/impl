@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"flag"
 	"fmt"
@@ -142,6 +143,11 @@ func output(res []Result, format string) {
 		}
 		fmt.Printf("%s\n", b)
 	case "xml":
+		b, err := xml.MarshalIndent(res, "", "  ")
+		if err != nil {
+			logger.Fatal(err)
+		}
+		fmt.Printf("%s\n", b)
 	}
 }
 
