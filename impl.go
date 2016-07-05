@@ -84,6 +84,10 @@ Run 'impl -h' for details.`)
 // findDef returns position of the declared type for the supplied type.
 // Specific for method receivers, since the Go spec does not allow them to be named
 // pointers.
+//
+// Sidenote: This is not the most thorough definition finder, but is enough for
+// this program since named pointers and chained pointers (**foo.Bar) cannot
+// be method receivers in Go .
 func findDef(typ types.Type) token.Pos {
 	switch n := typ.(type) {
 	case *types.Named:

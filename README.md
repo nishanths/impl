@@ -2,6 +2,8 @@
 
 impl is a tool to find implementers of an interface in Go programs.
 
+[![CircleCI](https://circleci.com/gh/nishanths/impl.svg?style=svg)](https://circleci.com/gh/nishanths/impl)
+
 For example:
 
 ```
@@ -38,8 +40,6 @@ The implementer type and interface type should both reside in the supplied path.
 Also see the [go oracle](https://godoc.org/golang.org/x/tools/cmd/oracle) for a similar, more machine-friendly tool. Unlike the oracle, impl directly takes the interface name as input instead of filename/byte offsets.
 
 ## Install
-
-With Go installed:
 
 ```
 go get -u github.com/nishanths/impl
