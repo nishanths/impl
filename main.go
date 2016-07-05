@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	usage = `Find types that implement a specified interface in go programs.
+	usage = `Find implementing types in go source code.
 
 Example:
   impl -interface datastore.RawInterface -path ~/go/src/github.com/luci/gae
@@ -47,7 +47,7 @@ func main() {
 	}
 	flag.StringVar(&arg.Path, "path", "", "absolute or relative path to directory to search")
 	flag.StringVar(&arg.Interface, "interface", "", "interface name to find implementing types for, format: packageName.interfaceName")
-	flag.StringVar(&arg.Format, "format", "plain", "output format, one of: {plain,json,xml}")
+	flag.StringVar(&arg.Format, "format", "plain", "output format, should be one of: {plain,json,xml}")
 	flag.BoolVar(&arg.NoColor, "no-color", false, "disable color output")
 	flag.Parse()
 
